@@ -10,7 +10,7 @@ import {
   Search,
   Send,
 } from "lucide-react"
-import { useState } from "react"
+import { FormEvent, useState } from "react"
 
 const promptActions = [
   { icon: Paperclip, label: "Attach" },
@@ -25,19 +25,48 @@ const quickActions = [
   { icon: Languages, label: "Translate" },
 ]
 
-type ChatMessage = { id: number; content: string }
+type ChatMessage = { role: string; content: string }
 
 export default function Chat() {
-  const [chat, setChat] = useState<ChatMessage[]>([])
-  const [promptValue, setPromptValue] = useState("")
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState("")
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  //   e.preventDefault()
+  //   const next = Input.trim()
+  //   if (!next) return
+  //   setMessages((prev) => [...prev, { id: Date.now(), content: next }])
+  //   setInput("")
+  //   console.log("Prompt:", next)
+  // }
+
+  const sendMessage = async (e: FormEvent) => {
     e.preventDefault()
-    const next = promptValue.trim()
-    if (!next) return
-    setChat((prev) => [...prev, { id: Date.now(), content: next }])
-    setPromptValue("")
-    console.log("Prompt:", next)
+    try {
+      const userMessage = {
+        role: "user",
+        content: input,
+      }
+
+      const updatedMessages = [...messages, userMessage]
+
+      setMessages(updatedMessages)
+      setInput("")
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          messages: [userMessage],
+        }),
+      })
+
+      const aiMessage = await res.json()
+
+      setMessages((prev) => [...prev, aiMessage])
+      console.log("message:", messages)
+    } catch (error) {
+      console.log("error while sending message: ", error)
+    }
   }
 
   const renderInput = (compact?: boolean) => (
@@ -49,12 +78,12 @@ export default function Chat() {
       }
     >
       <form
-        onSubmit={handleSubmit}
+        onSubmit={sendMessage}
         className={`${compact ? "" : "mb-4"} flex items-center gap-2`}
       >
         <input
-          value={promptValue}
-          onChange={(e) => setPromptValue(e.currentTarget.value)}
+          value={input}
+          onChange={(e) => setInput(e.currentTarget.value)}
           placeholder="Ask Nomi anything..."
           className={`flex h-11 w-full rounded-xl border border-white/15 bg-transparent px-4 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-white/30 ${
             compact ? "h-12" : ""
@@ -98,7 +127,7 @@ export default function Chat() {
     <div className="flex h-[calc(100vh-70px)] bg-[#0b1220] text-white w-full">
       <Sidebar />
       <div className="flex w-full">
-        {chat.length === 0 ? (
+        {messages.length === 0 ? (
           <section className="flex-1 flex flex-col items-center justify-center text-center px-6">
             <div className="w-20 h-20 rounded-full bg-linear-to-br from-cyan-300 via-blue-500 to-indigo-600 shadow-xl mb-6" />
 
@@ -128,18 +157,29 @@ export default function Chat() {
         ) : (
           <section className="flex-1 flex flex-col">
             <div className="flex-1 overflow-y-auto px-20 py-8 space-y-4">
-              {chat.map((message, idx) => (
-                <div key={message.id} className="flex justify-end">
-                  <div className="max-w-3xl rounded-2xl border border-white/10 bg-linear-to-br from-cyan-400/10 via-blue-500/10 to-transparent px-4 py-3 shadow shadow-cyan-500/15">
-                    <p className="text-lg text-white text-left">
-                      {message.content}
-                    </p>
-                    {/* <span className="mt-2 block text-[11px] text-gray-400">
+              {messages.map((message, idx) =>
+                message.role === "user" ? (
+                  <div key={idx} className="flex justify-end">
+                    <div className="max-w-3xl rounded-2xl border border-white/10 bg-linear-to-br from-cyan-400/10 via-blue-500/10 to-transparent px-4 py-3 shadow shadow-cyan-500/15">
+                      <p className=" text-white text-left">{message.content}</p>
+                      {/* <span className="mt-2 block text-[11px] text-gray-400">
                       You · #{idx + 1}
                     </span> */}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ) : (
+                  <div key={idx} className="flex justify-start">
+                    <div className="max-w-3xl  px-4 py-3 ">
+                      <p className="text-lg text-white text-left">
+                        {message.content}
+                      </p>
+                      {/* <span className="mt-2 block text-[11px] text-gray-400">
+                      You · #{idx + 1}
+                    </span> */}
+                    </div>
+                  </div>
+                ),
+              )}
             </div>
 
             {renderInput(true)}
